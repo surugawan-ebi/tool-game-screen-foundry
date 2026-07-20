@@ -71,8 +71,8 @@ The project is currently beta-quality. It is useful for validating a production 
 Prerequisite: Node.js 20 or newer for the browser workflow. The desktop shell requires Node.js 22.12 or newer because it uses Electron 43.
 
 ```sh
-git clone https://github.com/surugawan-ebi/game-screen-foundry.git
-cd game-screen-foundry
+git clone https://github.com/surugawan-ebi/tool-game-screen-foundry.git
+cd tool-game-screen-foundry
 npm test
 npm run dev
 ```
