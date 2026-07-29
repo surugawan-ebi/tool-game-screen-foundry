@@ -9,7 +9,7 @@ Expected flow:
 3. Register the file in `world-preset.json` under `imagegenAssets`, or provide `imagegen-assets.json` when loading a custom folder.
 4. Press `素材を一括生成` in the beta app. Registered files are adopted as generated asset revisions.
 
-The demo currently includes registered PNG seeds for all 50 HOME-screen assets targeted by `imagegenWorkflow.targetAssetIds`.
+The demo currently includes registered PNG seeds for all 51 HOME-screen assets targeted by `imagegenWorkflow.targetAssetIds`.
 
 Most large panels, buttons, and icons are built-in imagegen outputs converted from chroma-key backgrounds to transparent PNG. The following 9 precision UI parts are local raster composites because fixed geometry is more important than generative variation:
 
@@ -37,7 +37,6 @@ Major built-in imagegen style carriers include:
 - `ribbon_event_live.png`
 - `frame_daily_mission_outer.png`
 - `btn_start_sortie.png`
-- `card_side_cta_shell.png`
 - `icon_gift_crate.png`
 - `icon_gacha_orb.png`
 - `panel_bottom_nav.png`
