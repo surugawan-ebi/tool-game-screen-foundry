@@ -39,3 +39,13 @@
 - 主担当はサブエージェントの成果、差分、テスト結果を自身で確認し、未確認のまま採用しない。委譲しても統合責任と最終責任は主担当に残る。
 - CodexとClaudeの相互レビューは、利用可能かつ安全な場合に追加で行う。外部クロスレビューだけを、利用可能な内部サブエージェントの代用にはしない。
 <!-- END managed:subagent-delegation-policy:v1 -->
+
+<!-- BEGIN managed:github-access-policy:v1 -->
+## GitHubアクセスの標準経路
+
+- 管理対象GitHub repositoryのclone、fetch、pull、pushはSSHを標準とし、`origin`は同じowner／repositoryを指すSSH URLを使用する。remote変更前に現在の接続先を確認し、非GitHub remote、CI専用checkout、submodule、runtime vendor、ignoreされたnested repositoryへ機械的に適用しない。
+- Pull Requestの作成、確認、review、ready化、mergeは、対象accountで認証済みのGitHub CLI（`gh`）を標準経路とする。ただし、上位workspaceの`local-mcp`優先規則と`workspace-git`のprepare → 人間承認 → execute境界を優先し、`workspace-git`の安全拒否を`gh`へ迂回しない。`workspace-git`が対象操作を実装していない場合だけ、既存のworkspace／repo規則に従って`gh`を検討する。
+- GitHub connector、app連携、`github:yeet`が権限・可視性・404等で処理できない場合も、まず`workspace-git`の接続状態と拒否理由を確認し、上位規則が許可する場合に限って`gh`へfallbackする。
+- connector失敗をrepository不存在や権限不足と即断しない。SSHが正常な管理PCで、HTTPS remote、PAT、credential helperを場当たり的に試行・変更しない。SSH障害時はaccount、host key、remote owner／repositoryを診断し、無断でHTTPSへ恒久変更しない。
+- 秘密鍵path、token、credential値をrepository、ログ、prompt、knowledge本文へ保存しない。通信経路の標準化はcommit、push、PR作成、mergeの許可範囲を拡張しない。
+<!-- END managed:github-access-policy:v1 -->
