@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://surugawan-ebi.github.io/game-screen-foundry/schemas/project-manifest.schema.json",
+  "$id": "https://surugawan-ebi.github.io/tool-game-screen-foundry/schemas/project-manifest.schema.json",
   "title": "Game Screen Foundry Project Manifest",
   "type": "object",
   "additionalProperties": false,
@@ -65,4 +65,3 @@
     }
   }
 }
-
