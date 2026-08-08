@@ -1,20 +1,45 @@
 # Game Screen Foundry
 
-ゲーム画面アセットを、仕様から生成・組み立て・レビューするためのローカルワークベンチです。  
-Spec-driven local workbench for generating, assembling, and reviewing game screen assets.
+画像生成で作ったゲーム画面を「一枚絵」で終わらせず、実装で再利用できる背景・パネル・ボタン・アイコン・runtime textへ分解するためのローカルワークベンチです。
 
-Game Screen Foundry は、ゲーム開発者が `screen KV + 素材仕様書` から、ゲーム内で再利用しやすい UI / 2D アセットを作るためのローカルブラウザツールです。販促画像ジェネレーターではありません。
+A local workbench that turns a generated game-screen concept into reusable backgrounds, panels, buttons, icons, and runtime text instead of leaving it as one flattened image.
 
-Game Screen Foundry is a local browser tool for game developers who want to turn a screen KV and a material specification into reusable in-game UI assets. It is not a marketing image generator.
+![Game Screen Foundryで51個の分離PNG素材とruntime overlayから再構成した星港アトラスのHOME画面](docs/assets/sky-port-home-assembled.png)
+
+上の画面は、同梱の[星港アトラス HOMEサンプル](examples/sky-port-home/)を、ツール自身の `screen:snapshot` で51個の分離PNG素材とruntime overlayから再構成した実出力です。完成画面を1枚の画像として貼ったものではありません。
+
+The screen above is a real `screen:snapshot` output assembled from the bundled [Sky Port Atlas HOME sample](examples/sky-port-home/), using 51 separate PNG assets plus runtime overlays. It is not a flattened mockup pasted into the preview.
+
+## 30秒で分かる制作ループ / The 30-Second Workflow
 
 ```text
 screen KV + material spec
-  -> generated asset PNGs
-  -> assembled game screen preview
-  -> review / comments
-  -> regeneration queue
-  -> re-import generated PNGs
+  -> inspect layout as a structural wireframe
+  -> create separate PNG assets through an ImageGen handoff
+  -> assemble and validate the implementation-ready screen layout
+  -> review only the assets that need changes
+  -> regenerate, re-import, and hand off to the game repo
 ```
+
+Game Screen Foundryは、画面仕様、素材ごとの生成契約、仮組み、検査、再生成キューを同じプロジェクトで管理します。画像生成そのものをホストするサービスではなく、Codex / ClaudeとImageGenを使う制作フローの設計・品質ゲートを担当します。
+
+Game Screen Foundry keeps the screen contract, per-asset generation contracts, assembly preview, validation, and regeneration queue in one project. It does not host image generation; it provides the production workflow and quality gates used with Codex or Claude and an ImageGen-capable environment.
+
+## 同梱デモを試す / Try the Bundled Demo
+
+前提はNode.js 20以上です。cloneしてローカルサーバーを起動します。
+
+Requires Node.js 20 or newer. Clone the repository and start the local server:
+
+```sh
+git clone https://github.com/surugawan-ebi/tool-game-screen-foundry.git
+cd tool-game-screen-foundry
+npm run dev
+```
+
+`http://127.0.0.1:4311` を開き、`デモを読み込む` を押してください。インストール不要のブラウザ版で、生成済み画面、ワイヤーフレーム、JSON、素材、レビュー、再生成キューを確認できます。
+
+Open `http://127.0.0.1:4311` and click `デモを読み込む` / **Load demo**. The browser workflow lets you inspect the assembled screen, wireframe, JSON, assets, review findings, and regeneration queue without installing the desktop shell.
 
 現在は public beta 品質です。制作ループの検証には使えますが、schema と UI は今後も変わる前提です。  
 The project is currently beta-quality. It is useful for validating a production loop, but the schema and UI are still expected to change.
@@ -65,24 +90,7 @@ The project is currently beta-quality. It is useful for validating a production 
 - 基本プレビューに Codex/imagegen は必須ではありません。PNG を `generated-assets/` に手で置く運用もできます。  
   It does not require Codex/imagegen for basic preview. You can place PNGs manually in `generated-assets/`.
 
-## クイックスタート / Quick Start
-
-前提: ブラウザ版は Node.js 20 以上。デスクトップ版は Electron 43 の都合で Node.js 22.12 以上。
-Prerequisite: Node.js 20 or newer for the browser workflow. The desktop shell requires Node.js 22.12 or newer because it uses Electron 43.
-
-```sh
-git clone https://github.com/surugawan-ebi/game-screen-foundry.git
-cd game-screen-foundry
-npm test
-npm run dev
-```
-
-ブラウザで開きます。  
-Open:
-
-```text
-http://127.0.0.1:4311
-```
+## デスクトップ版と起動設定 / Desktop and Project Startup
 
 デスクトップ版として開く場合は Electron を入れてから起動します。macOS / Windows / Linux で同じコードを使います。
 To open the desktop shell, install Electron first. The same app code runs on macOS, Windows, and Linux.

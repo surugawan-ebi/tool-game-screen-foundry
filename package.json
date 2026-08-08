@@ -7,12 +7,12 @@
   "type": "commonjs",
   "repository": {
     "type": "git",
-    "url": "https://github.com/surugawan-ebi/game-screen-foundry.git"
+    "url": "https://github.com/surugawan-ebi/tool-game-screen-foundry.git"
   },
   "bugs": {
-    "url": "https://github.com/surugawan-ebi/game-screen-foundry/issues"
+    "url": "https://github.com/surugawan-ebi/tool-game-screen-foundry/issues"
   },
-  "homepage": "https://github.com/surugawan-ebi/game-screen-foundry#readme",
+  "homepage": "https://github.com/surugawan-ebi/tool-game-screen-foundry#readme",
   "keywords": [
     "game-ui",
     "game-assets",
