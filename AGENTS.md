@@ -2,6 +2,11 @@
 
 上位workspaceの `AGENTS.md` がある場合は併用し、このrepoの `README.md`、`docs/`、同梱skillの `SKILL.md`、release checklistを作業前に確認する。
 
+## LUNA主担当と上位サブエージェント
+
+- 通常の主担当・統合責任者はLUNAとする。難しい設計、原因未特定bug、複数repo・layer、security・build・deploy・release gateでは、Sol等の上位エスカレーションmodelへboundedな独立reviewを依頼する。
+- LUNAは委譲結果を差分と検証結果で確認して採否を決め、最終責任を持つ。上位modelを常時の司令塔へ自動昇格させない。
+
 ## AIオーケストレーション
 
 <!-- BEGIN managed:subagent-delegation-policy:v1 -->
@@ -43,9 +48,9 @@
 <!-- BEGIN managed:github-access-policy:v1 -->
 ## GitHubアクセスの標準経路
 
-- 管理対象GitHub repositoryのclone、fetch、pull、pushはSSHを標準とし、`origin`は同じowner／repositoryを指すSSH URLを使用する。remote変更前に現在の接続先を確認し、非GitHub remote、CI専用checkout、submodule、runtime vendor、ignoreされたnested repositoryへ機械的に適用しない。
-- Pull Requestの作成、確認、review、ready化、mergeは、対象accountで認証済みのGitHub CLI（`gh`）を標準経路とする。ただし、上位workspaceの`local-mcp`優先規則と`workspace-git`のprepare → 人間承認 → execute境界を優先し、`workspace-git`の安全拒否を`gh`へ迂回しない。`workspace-git`が対象操作を実装していない場合だけ、既存のworkspace／repo規則に従って`gh`を検討する。
-- GitHub connector、app連携、`github:yeet`が権限・可視性・404等で処理できない場合も、まず`workspace-git`の接続状態と拒否理由を確認し、上位規則が許可する場合に限って`gh`へfallbackする。
+- clone、fetch、pull、branch、commit、push、Draft PR、Ready化、mergeは、接続済みの`workspace-git` MCPを第一選択とし、prepare → 会話承認ボタン → executeの境界を守る。
+- `workspace-git`が拒否・未接続・未実装の場合、直接`git`／`gh`／GitHub MCPへ迂回しない。MCP未実装のread-only確認だけは、理由と対象を説明して明示承認を得た場合に限り別経路を検討する。
+- Git transportのoriginは同じowner／repositoryを指すSSH URLに限定する。remote変更前に現在の接続先を確認し、非GitHub remote、CI専用checkout、submodule、runtime vendor、ignoreされたnested repositoryへ機械的に適用しない。
 - connector失敗をrepository不存在や権限不足と即断しない。SSHが正常な管理PCで、HTTPS remote、PAT、credential helperを場当たり的に試行・変更しない。SSH障害時はaccount、host key、remote owner／repositoryを診断し、無断でHTTPSへ恒久変更しない。
 - 秘密鍵path、token、credential値をrepository、ログ、prompt、knowledge本文へ保存しない。通信経路の標準化はcommit、push、PR作成、mergeの許可範囲を拡張しない。
 <!-- END managed:github-access-policy:v1 -->

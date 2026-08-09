@@ -5,5 +5,5 @@
 <!-- BEGIN managed:github-access-policy-bridge:v1 -->
 ## GitHub access bridge
 
-GitHubのclone／fetch／pull／push、PR操作、認証fallbackでは、`AGENTS.md`の「GitHubアクセスの標準経路」を必ず適用する。Claude CodeでもGit transportはSSH、PR操作は認証済み`gh`を標準とするが、上位workspaceの`local-mcp`／`workspace-git`優先規則とprepare → 人間承認 → execute境界を優先し、安全拒否を別経路で迂回しない。connector失敗時も上位規則が許可する場合に限ってfallbackする。
+GitHubのclone／fetch／pull／branch／commit／push、PR操作では、`AGENTS.md`の「GitHubアクセスの標準経路」を必ず適用する。Claude Codeでも接続済み`workspace-git` MCPを第一選択とし、prepare → 会話承認ボタン → executeを守る。MCP拒否時に直接`git`／`gh`へ迂回せず、MCP未実装のread-only確認以外は停止して報告する。
 <!-- END managed:github-access-policy-bridge:v1 -->
