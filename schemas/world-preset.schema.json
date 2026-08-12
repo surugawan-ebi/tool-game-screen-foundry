@@ -60,6 +60,33 @@
         }
       }
     },
+    "creativeDirection": {
+      "type": "object",
+      "description": "Human-approved visual direction gate record. The actual mood, palette, materials, and lighting remain in this world preset.",
+      "additionalProperties": true,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["draft", "approved"]
+        },
+        "visualThesis": { "type": "string", "minLength": 8 },
+        "referenceMode": {
+          "type": "string",
+          "enum": ["key_visual", "reference_images", "text_only"]
+        },
+        "keyVisualReference": { "type": "string" },
+        "textOnlyRationale": { "type": "string" },
+        "mustHave": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "mustNotHave": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "scope": { "type": "string" }
+      }
+    },
     "kvGuidance": {
       "type": "object",
       "additionalProperties": true

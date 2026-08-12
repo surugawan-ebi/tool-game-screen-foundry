@@ -16,6 +16,31 @@ Use this skill for Game Screen Foundry project work: creating screen folders, ed
 5. Run `npm run release:check` before handing off repo changes.
 6. Prefer project-relative paths and screen-folder-relative image paths; avoid machine-local absolute paths in committed JSON.
 
+## Mandatory Creative Direction Gate
+
+Do not start visual production from a vague request such as “make the creative”. Before
+creating or changing a screen direction, material spec, layout, imagegen job, raster asset,
+or adopted image, locate an approved project direction brief. For Foundry projects, the
+mechanical approval record is `world-preset.json.creativeDirection.status: approved`; a
+narrative `creative/creative-direction.md` may supplement it but cannot replace that status.
+
+- The brief must state the purpose/audience, mood and style keywords, palette anchors and
+  colors to avoid, shape/material/lighting language, camera or composition intent, references
+  (or an explicit `none`), and must-have / must-not-have constraints. Add target platform,
+  orientation, and canvas only when those are known; keep unknowns marked `TBD` rather than
+  inventing them.
+- An existing KV, `world-preset`, or adopted asset may be evidence for a proposed brief, but
+  it is not permission to silently choose a new direction. Summarize the inferred direction
+  and ask the user to confirm it before the first generation or visual edit when the brief is
+  missing, incomplete, or not marked approved.
+- If the direction is not approved, stop after the intake/proposal. Do not run
+  `imagegen:handoff`, call ImageGen, write PNGs, adopt candidates, or change layout coordinates.
+  It is fine to inspect files and prepare a non-generative proposal.
+- After the user confirms, record the approved brief and its constraints (including the
+  Foundry `creativeDirection.status`) before continuing.
+  Every prompt and regeneration must refer to that brief; never replace it with a genre-based
+  guess during an autonomous iteration.
+
 ## Task Routing
 
 - Choosing app-guided, autonomous, or hybrid operation: read `references/operating-modes.md`.

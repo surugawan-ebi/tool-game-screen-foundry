@@ -4,6 +4,11 @@ Use this workflow when the agent should progress without asking the user to open
 
 ## 1. Establish The Session
 
+Before starting an autonomous session, verify that the target project has an approved creative
+direction brief. If it is missing or unapproved, do not start a generation session; return the
+direction intake/proposal and wait for confirmation. `--approval major_changes` is not a
+substitute for this pre-generation gate.
+
 Start a bounded session and retain the returned `sessionId`:
 
 ```sh
