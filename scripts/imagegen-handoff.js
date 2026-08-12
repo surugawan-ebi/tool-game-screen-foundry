@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { resolveBundleFromFolder } = require("../lib/folder-loader");
+const { assertCreativeDirectionApproved } = require("../lib/creative-direction");
 const { prepareImagegenWorkflow } = require("../lib/imagegen-workflow");
 const { prepareInput } = require("../lib/spec");
 
@@ -104,6 +105,7 @@ function main() {
     screenId: requestedScreenId || ""
   });
   const input = prepareInput(loaded.bundle);
+  assertCreativeDirectionApproved(input.worldPreset);
   if (options.assets && options.assets.length) {
     const known = new Set(input.materialSpecSheet.assets.map((asset) => asset.assetId));
     const unknown = options.assets.filter((assetId) => !known.has(assetId));
@@ -164,6 +166,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  assertCreativeDirectionApproved,
   persistRegistry,
   portablePath
 };
