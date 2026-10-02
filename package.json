@@ -42,7 +42,7 @@
     "test": "node --test"
   },
   "devDependencies": {
-    "electron": "^43.0.0"
+    "electron": "^43.5.0"
   },
   "engines": {
     "node": ">=20"
