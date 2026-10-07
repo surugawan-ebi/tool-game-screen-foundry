@@ -9,11 +9,11 @@ Use this skill for Game Screen Foundry project work: creating screen folders, ed
 
 ## Start Here
 
-1. Locate the repository root and read `README.md`, `docs/schema.md`, and `docs/release-checklist.md` only as needed.
+1. Distinguish the Foundry tool checkout from the target game's creative project. Follow the target repository's checkout/synchronization rules, record the tool revision, and run the CLI from that tool root with the creative project as its argument. Read `README.md`, `docs/schema.md`, and `docs/release-checklist.md` for the relevant workflow.
 2. Preserve the three-file screen contract: `screen-kv.json`, `material-spec.json`, `world-preset.json`.
 3. Keep generated job output out of Git: never stage generated files under `imagegen-jobs/`, except `imagegen-jobs/.gitkeep`.
 4. For purchased/reference assets, derive only a quality profile; never copy proprietary source assets into this repository.
-5. Run `npm run release:check` before handing off repo changes.
+5. Run `npm run release:check` for Foundry tool code/docs/schema/template/workflow changes. For a game's screen-only edits, run the project validation and assembled-screen review below.
 6. Prefer project-relative paths and screen-folder-relative image paths; avoid machine-local absolute paths in committed JSON.
 
 ## Mandatory Creative Direction Gate
@@ -57,11 +57,11 @@ Default to `hybrid` when the user does not choose a mode: build and validate the
 ## Non-Negotiable Rules
 
 - Do not treat this as a general-purpose image generator.
-- Do not promise hosted image generation. In a Codex environment, prefer the installed `imagegen` Skill for raster generation and editing; otherwise use the agent-neutral prompt/job handoff and PNG re-import workflow.
+- Do not promise hosted image generation. Use ImageGen for new or edited raster assets through the available tool and its governing instructions; the agent-neutral handoff does not authorize another generator. If ImageGen is unavailable, record the job's blocker sidecar.
 - Do not bake runtime text, values, labels, timers, or notification counts into generated PNGs unless `textHandling.ownership` is explicitly `baked_in_asset`.
 - Do not collapse parent frames and child UI into one image when the material spec separates them.
 - Do not bake functional surfaces (world maps, boards, list surfaces, tap targets) into background assets. Split the backdrop and the functional surface into separate assets, give the functional surface its own frame, and place tokens/markers on the surface asset.
-- Do not rely on runtime stretching. Generate every raster at its final placement pixel size. Declare `exportRequirements.scalingPolicy: "nine_slice"` with `nineSliceInsets` only when the asset family is genuinely designed for slicing; otherwise the scaling audit fails the asset.
+- Do not rely on runtime stretching. Generate every raster at its final placement pixel size. Declare `exportRequirements.scalingPolicy: "nine_slice"` with `nineSliceInsets` only when the asset family is genuinely designed for slicing and the target repository permits it; otherwise the scaling audit fails the asset.
 - Do not add `allowedOverlaps`, `layerFitRules` with `minInset: 0`, or other declarations merely to make validation pass. Declarations must describe real visual intent; a layer that sits flush on a foundation root fails regardless of the declared minInset.
 - Foundation shells (docks, bottom sheets, panels, HUD plates) must declare a composition group `contentInset` matching their baked frame thickness, so the decoration budget and child-content checks reflect the real usable area. The declared inset must match the frame actually painted in the PNG — if the generated art grew a wider frame, regenerate it with the decoration budget or raise the inset and re-place children.
 - Sibling runtime lanes on one shell (HUD values, row counters) must share one lane template: same slot height, same vertical center, one font scale per rank. Intentional hierarchy (title + meta) needs a 1.4x+ font ratio. The `lane_rhythm_inconsistent` check enforces this, and the imagegen prompt declares the exact lane count so baked segment dividers match the content structure.
@@ -98,7 +98,7 @@ Pick the value that matches the key visual / world preset art direction. Look at
 
 Rules of thumb:
 
-- If the project has adopted PNGs and no declared craftStyle, `npm run validate:project` prints a `craft_style_unset` hint with a measured suggestion — use it as the default answer unless the user states a different art direction.
+- If the project has adopted PNGs and no declared craftStyle, `npm run validate:project` prints a `craft_style_unset` hint with a measured suggestion — treat it as a candidate to compare with the approved direction, not as approval to change that direction.
 - Declare exactly one craftStyle per world preset; all screens sharing that preset inherit it, keeping the whole game one family.
 - If many `craft_*` warnings appear right after declaring a style, first re-check the style choice (a `painterly` project audited as `outlined_cel` floods outline warnings). Only after the style is confirmed should you treat the warnings as regeneration work.
 - Do not leave craftStyle unset in real projects: unset means the craft audit is off and prompts carry no craft spec.
@@ -106,7 +106,7 @@ Rules of thumb:
 
 For richer, project-specific targets, run `npm run profile:reference -- <purchased-asset-root>` and apply the compact profile to `worldPreset.qualityProfile.referenceDerived`; the profile now also captures outline coverage/contrast and luminance band counts from the reference set.
 
-After importing generated PNGs, run `npm run postprocess:assets -- <screen-folder> --apply` to remove a detected flat green chroma key, validate required alpha, trim transparent gutters, and normalize each PNG to its target pixel size (foundation surfaces are stretched edge-to-edge; icons are uniform-fitted and centered). A transparent asset without usable alpha or a removable chroma-key border must not be adopted.
+Before postprocessing or `--adopt`, compare the job's postprocess policy with the target repository's raster rules. `postprocess:assets --apply` and adoption can remove chroma keys, trim gutters, and resample PNGs; do not use them when untouched ImageGen bytes are required. In that case regenerate invalid outputs and stop if the available adoption path would alter them. Where explicitly permitted, inspect a dry-run before applying postprocessing, then recheck the resulting dimensions, alpha, and visual invariants. A transparent asset without usable alpha must not be adopted.
 
 ## Compose With The Imagegen Skill
 
@@ -117,7 +117,7 @@ When processing a handoff job in Codex:
 1. Read each asset's `generationContract` instead of treating `prompt` as an unstructured request.
 2. Pass every `inputImages` path to image generation with its declared role. `edit_target` is the current asset to modify; `style_reference` guides visual consistency.
 3. For edits, change only the `change` items and preserve every `preserve` invariant.
-4. Use the built-in imagegen path first. For simple transparent assets, follow the imagegen Skill's chroma-key workflow and remove the key before acceptance.
+4. Use the available ImageGen path. Request native transparency when required; use chroma-key removal only if the job and target repository permit that postprocessing.
 5. Inspect the isolated asset after generation. If one invariant fails visually, make one targeted retry rather than rewriting the whole prompt.
 6. Save the inspected PNG exactly to `outputPath`. Game Screen Foundry then runs its deterministic PNG acceptance gate and rejects invalid alpha, chroma residue, or final dimensions.
 
