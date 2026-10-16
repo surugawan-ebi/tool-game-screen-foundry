@@ -1,74 +1,17 @@
 "use strict";
 
-const fs = require("fs");
 const path = require("path");
+const { inspectRepository, formatFindings } = require("./repository-hygiene");
 
-const root = path.resolve(__dirname, "..");
-const ignoredDirs = new Set([
-  ".git",
-  ".reference-quality-profiles",
-  "coverage",
-  "imagegen-jobs",
-  "imagegen-status",
-  "node_modules",
-  "tmp"
-]);
-const ignoredExtensions = new Set([
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".webp",
-  ".gif",
-  ".ico"
-]);
-const patterns = [
-  /\/Users\//u,
-  /private\/tmp/u,
-  /app\/neta/u,
-  /Applications\/Codex/u
-];
-const allowedCommandSnippets = [
-  "rg -n \"/Users/|private/tmp|app/neta|Applications/Codex\"",
-  "rg -n \\\"/Users/|private/tmp|app/neta|Applications/Codex\\\""
-];
-
-function walk(dirPath, bucket = []) {
-  for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      if (!ignoredDirs.has(entry.name)) {
-        walk(path.join(dirPath, entry.name), bucket);
-      }
-      continue;
-    }
-    if (entry.isFile() && !ignoredExtensions.has(path.extname(entry.name).toLowerCase())) {
-      bucket.push(path.join(dirPath, entry.name));
-    }
+try {
+  const findings = inspectRepository(path.resolve(__dirname, ".."));
+  if (findings.length) {
+    process.stderr.write(`Repository hygiene check failed:\n${formatFindings(findings)}\n`);
+    process.exitCode = 1;
+  } else {
+    process.stdout.write("Repository hygiene check ok\n");
   }
-  return bucket;
+} catch {
+  process.stderr.write("Repository hygiene check could not inspect the Git index or candidate files.\n");
+  process.exitCode = 1;
 }
-
-const findings = [];
-
-for (const filePath of walk(root)) {
-  const relativePath = path.relative(root, filePath);
-  const text = fs.readFileSync(filePath, "utf8");
-  text.split(/\r?\n/u).forEach((line, index) => {
-    if (relativePath === "scripts/check-local-paths.js" && index < 32) {
-      return;
-    }
-    if (!patterns.some((pattern) => pattern.test(line))) {
-      return;
-    }
-    if (allowedCommandSnippets.some((snippet) => line.includes(snippet))) {
-      return;
-    }
-    findings.push(`${relativePath}:${index + 1}: ${line.trim()}`);
-  });
-}
-
-if (findings.length) {
-  process.stderr.write(`Local path check failed:\n${findings.join("\n")}\n`);
-  process.exit(1);
-}
-
-process.stdout.write("Local path check ok\n");

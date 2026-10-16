@@ -43,6 +43,29 @@ npm run validate:project -- /path/to/game/creative shop
 - Update [README.md](README.md) when changing user-facing workflow.
 - Add or update tests for behavior changes.
 
+## Personal Configuration and Public Files
+
+`AGENTS.md` and `CLAUDE.md` are shared, public contributor instructions. Keep
+personal model preferences, private tool connections, approval integrations, and
+machine paths in user-level settings or ignored `AGENTS.local.md` and
+`CLAUDE.local.md` files. Local instruction files must be loaded according to your
+agent client's configuration; their filenames do not guarantee automatic loading.
+
+Local agent directories (`.codex/`, `.claude/`, `.agents/`), MCP configuration,
+environment files, and credential material are ignored. Keep shared project skills
+in `skills/`. `.env.example` may contain placeholders only. Public author credits
+and repository links are intentional project metadata.
+
+`npm run release:check` inspects tracked files and nonignored new files for private
+configuration and local paths. It also checks staged content and reports categories
+and locations without printing matched values. These checks are heuristics, not a
+guarantee that every secret format will be detected.
+
+Adding an ignore rule does not untrack existing files or remove earlier commits.
+Review the index before publishing. If credentials were previously published,
+revoke or rotate them first; coordinate any history cleanup separately. Keep audit
+reports containing private values outside the repository.
+
 ## Design Boundaries
 
 - This is a local-first workbench, not a hosted service.

@@ -23,7 +23,10 @@ For public beta, please report security-sensitive issues privately to the reposi
 ## Handling Local Project Data
 
 - Do not commit `.env` files.
+- Keep personal agent settings, MCP configuration, and credentials in ignored local
+  files or user-level configuration. Shared instructions must remain portable.
+- Ignore rules do not remove tracked files or published history. Rotate any exposed
+  credentials and coordinate removal of historical private data separately.
 - Do not commit generated `imagegen-jobs/` output.
 - Do not commit external game project workspaces into this repository.
 - Treat bundled `examples/` as demo fixtures, not as production asset packs.
-
