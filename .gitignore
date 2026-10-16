@@ -42,3 +42,19 @@ Thumbs.db
 
 # local editor/agent workspace
 .claude/
+.codex/
+.agents/
+AGENTS.local.md
+CLAUDE.local.md
+.mcp.json
+.mcp.local.json
+
+# Local credentials and signing material
+.npmrc
+.netrc
+.ssh/
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
