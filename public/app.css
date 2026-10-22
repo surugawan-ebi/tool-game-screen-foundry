@@ -2268,3 +2268,27 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+.layer-panel {
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.layer-group {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.layer-group-header, .layer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+}
+
+.layer-group-header[draggable="true"] { cursor: grab; }
+.layer-group-header strong, .layer-name { flex: 1; min-width: 0; }
+.layer-name { overflow-wrap: anywhere; text-align: left; }
+.layer-row.is-selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+.layer-row button[aria-pressed="true"] { font-weight: bold; text-decoration: underline; }
