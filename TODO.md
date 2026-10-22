@@ -122,7 +122,7 @@ This file is the handoff note for the public beta. The current repository is usa
 ## Release Checklist
 
 - `npm test`
-- Confirm `rg -n "/Users/|private/tmp|app/neta|Applications/Codex" .` returns no accidental local paths, except intentional documentation examples if any.
+- Run `npm run release:check` to detect local paths and private configuration in publishable files.
 - Confirm `imagegen-jobs/` contains only `.gitkeep` as a tracked file.
 - Confirm README Quick Start works from a fresh clone.
 - Confirm examples load and generated PNG previews are visible.

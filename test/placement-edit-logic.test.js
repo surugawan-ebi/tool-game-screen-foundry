@@ -4,11 +4,52 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  getLayerGroups,
+  reorderLayerGroup,
   captureStructuredEditSnapshot,
   collectDependentPlacementIds,
   getStructuredContractSnapshotKey,
   syncOverlayAbsoluteGeometryForSpec
 } = require("../public/placement-edit-logic");
+
+test("layer groups include text, sort front-first, and preserve equal-z membership", () => {
+  const spec = {
+    placements: [{ placementId: "base", zIndex: 0 }, { placementId: "a", zIndex: 10 }, { placementId: "b", zIndex: 10 }],
+    contentOverlays: [{ overlayId: "text", zIndex: 20 }]
+  };
+  assert.deepEqual(getLayerGroups(spec).map((group) => group.zIndex), [20, 10, 0]);
+  assert.equal(reorderLayerGroup(spec, {}, 10, 20), true);
+  assert.deepEqual(spec.placements.map((item) => item.zIndex), [0, 20, 20]);
+  assert.equal(spec.contentOverlays[0].zIndex, 10);
+  assert.equal(reorderLayerGroup(spec, {}, 20, 20), false);
+  assert.equal(reorderLayerGroup(spec, {}, 99, 20), false);
+  assert.equal(reorderLayerGroup(spec, {}, 20, 0), true);
+  assert.deepEqual(spec.placements.map((item) => item.zIndex), [10, 0, 0]);
+  assert.equal(spec.contentOverlays[0].zIndex, 20);
+});
+
+test("reordering cannot move or cross locked layers and failure is atomic", () => {
+  for (const lockedId of ["base", "middle", "text"]) {
+    const spec = {
+      placements: [{ placementId: "base", zIndex: -5 }, { placementId: "middle", zIndex: 0 }],
+      contentOverlays: [{ overlayId: "text", zIndex: 10 }]
+    };
+    const before = JSON.stringify(spec);
+    assert.throws(() => reorderLayerGroup(spec, { [lockedId]: { locked: true } }, 10, -5), /ロック/);
+    assert.equal(JSON.stringify(spec), before);
+  }
+});
+
+test("editor visibility and locks are undoable without becoming exported contract data", () => {
+  const workspace = { materialSpecSheet: { placements: [] }, layerEditorState: { base: { hidden: true, locked: true } } };
+  const before = captureStructuredEditSnapshot(workspace);
+  workspace.layerEditorState.base.hidden = false;
+  const after = captureStructuredEditSnapshot(workspace);
+  assert.equal(before.layerEditorState.base.hidden, true);
+  assert.notDeepEqual(before.layerEditorState, after.layerEditorState);
+  assert.equal(getStructuredContractSnapshotKey(before), getStructuredContractSnapshotKey(after));
+  assert.equal(before.materialSpecSheet.layerEditorState, undefined);
+});
 
 test("structured edit snapshots retain regeneration queue side effects without polluting contract dirty checks", () => {
   const workspaceState = {

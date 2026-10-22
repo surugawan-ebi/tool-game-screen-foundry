@@ -15,6 +15,7 @@
       materialSpecSheet: cloneValue(workspaceState.materialSpecSheet),
       worldPreset: cloneValue(workspaceState.worldPreset),
       revisionMap: cloneValue(workspaceState.revisionMap || {}),
+      layerEditorState: cloneValue(workspaceState.layerEditorState || {}),
       regenerationQueue: cloneValue(workspaceState.regenerationQueue || []),
       regenerationQueueDirty: Boolean(workspaceState.regenerationQueueDirty),
       regenerationPrompt: String(workspaceState.regenerationPrompt || "")
@@ -153,7 +154,41 @@
     return updated;
   }
 
+  function getLayerGroups(spec) {
+    const groups = new Map();
+    for (const item of [...(spec.placements || []), ...(spec.contentOverlays || [])]) {
+      const zIndex = Number(item.zIndex);
+      if (!groups.has(zIndex)) {
+        groups.set(zIndex, { zIndex, items: [] });
+      }
+      groups.get(zIndex).items.push(item);
+    }
+    return [...groups.values()].sort((left, right) => right.zIndex - left.zIndex);
+  }
+
+  function reorderLayerGroup(spec, editorState, sourceZ, targetZ) {
+    const groups = getLayerGroups(spec);
+    const sourceIndex = groups.findIndex((group) => group.zIndex === sourceZ);
+    const targetIndex = groups.findIndex((group) => group.zIndex === targetZ);
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+      return false;
+    }
+    const affected = groups.slice(Math.min(sourceIndex, targetIndex), Math.max(sourceIndex, targetIndex) + 1);
+    if (affected.some((group) => group.items.some((item) => (editorState[item.placementId || item.overlayId] || {}).locked))) {
+      throw new Error("ロックされたレイヤーをまたぐ並べ替えはできません。");
+    }
+    const levels = groups.map((group) => group.zIndex);
+    const [moved] = groups.splice(sourceIndex, 1);
+    groups.splice(targetIndex, 0, moved);
+    groups.forEach((group, index) => {
+      group.items.forEach((item) => { item.zIndex = levels[index]; });
+    });
+    return true;
+  }
+
   return {
+    getLayerGroups,
+    reorderLayerGroup,
     captureStructuredEditSnapshot,
     collectDependentPlacementIds,
     getStructuredContractSnapshotKey,

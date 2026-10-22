@@ -20,6 +20,13 @@ z-order consistency.
 - Confirm `imagegen-jobs/` has only `.gitkeep` as a tracked file.
 - Confirm generated job files remain ignored by Git.
 - Confirm `.env` files and external project workspaces are not tracked.
+- Confirm personal agent instructions, local agent directories, MCP configuration,
+  and credential files remain ignored and untracked; ignore rules alone do not
+  remove already tracked files.
+- Keep public `AGENTS.md` and `CLAUDE.md` portable, without personal model mandates
+  or private tool requirements. See [contributor guidance](../CONTRIBUTING.md).
+- Review any staged-content hygiene findings before publication. Release checks
+  inspect current files and the index, not historical commits or remote caches.
 
 ## Fresh Clone Smoke Test
 
