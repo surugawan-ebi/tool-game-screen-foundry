@@ -32,3 +32,12 @@ Keep machine-specific model preferences, tool routing, and approval integrations
 agent's user-level settings or ignored `AGENTS.local.md` / `CLAUDE.local.md` files.
 Local instruction discovery depends on the client: load those files explicitly when
 needed. They are not required to build, test, or contribute to this project.
+
+## Task completion and workspace cleanup
+
+- Cleanup is part of the task owner's responsibility. Report implementation, validation, publication/merge, and cleanup separately; a saved PR is not a merge into the target branch.
+- Delete only the task's local and remote topic branches after verifying the PR was merged, the intended changes are preserved in the target branch (including squash/rebase merges), and no other PR or active work depends on them. Never include default, shared, or protected branches.
+- For a PR-only request, keep the review-pending branch. Do not merge a PR merely to allow cleanup. A temporary clone may be cleaned independently once its required work is durably saved and can be retrieved again, provided no active work depends on that clone.
+- Before cleaning a temporary clone, verify its exact identity and ownership, saved results, absence of unsaved staged/unstaged/untracked work, and absence of active executions or dependent work. Use the documented cleanup lifecycle and reconcile its lease/registry records; do not delete directories or edit registry state as a substitute.
+- If a branch or clone must remain, record the reason, responsible owner, next action, and review date. Report blocked or unverified cleanup as pending, not complete.
+- These responsibilities do not grant new deletion, merge, or publication permissions. Preserve existing approval, lease, identity, snapshot, and safety checks. If a supported cleanup route is unavailable or refuses the action, stop that action and report the specific blocker without bypassing it.
