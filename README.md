@@ -46,6 +46,12 @@ The project is currently beta-quality. It is useful for validating a production 
 
 ## できること / What It Does
 
+- レイヤー一覧で素材・runtime textを選択し、表示切替と編集ロックを操作できます。同じ `zIndex` の見出しをドラッグするか↑↓で、グループ単位の重なり順を変更します。ロック対象を含む追従編集やロック層をまたぐ並べ替えは停止します。各操作は「直前状態へ戻す」で取り消せます。表示・ロックは画面読み込みまでの編集セッション専用で、JSON・書き出し・検証対象を変えません。並べ替えの `zIndex` は「画面JSONを保存」で保存します。ロックは構造化編集の誤操作防止であり、JSON直接編集を制限する権限機能ではありません。
+  The layer panel selects assets and runtime text, toggles preview visibility and editing locks, and reorders equal-z groups by dragging their headers or using the arrow buttons. Undo covers all these operations. Visibility and locks are session-only and do not affect exports or validation; reordered zIndex values use the existing JSON save workflow. Locks protect structured edits, not direct JSON editing.
+
+- 同じ `zIndex` の素材同士は重なり禁止です。配置矩形が重なると layout quality がエラーになり、背景・親子・グループ・重なり許可指定も例外にはなりません。辺が接するだけなら許可されます。意図的に重ねる素材には異なる `zIndex` を指定してください。
+  Asset placements on the same `zIndex` must not overlap. Layout quality rejects intersecting bounds, including backgrounds, parent/child pairs, grouped placements, and explicitly allowed overlaps. Touching edges are allowed; intentional stacking requires different `zIndex` values.
+
 - 画面 KV、素材仕様書、世界観プリセットを読み込みます。  
   Loads a screen KV, material spec, and world preset.
 - パネル、ボタン、アイコン、背景、バッジ、runtime text、overlay などをレイヤーとして組み立てます。  

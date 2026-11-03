@@ -250,6 +250,16 @@ Important rules:
 
 ### `assemblyPolicy.layoutSafetyPolicy`
 
+Placements with the same numeric `zIndex` are on the same layer and must not
+overlap. Any positive intersection of their anchor-resolved rectangular bounds
+fails with `same_layer_overlap`; touching edges or corners are allowed. This
+includes backgrounds, contained placements, parent/child pairs, and composition
+group members. Neither `allowedOverlaps` nor a permissive policy exempts them.
+Move the placements apart or use different `zIndex` values for intentional
+stacking (which still follows the existing overlap rules). This check compares
+placement bounds, not opaque PNG pixels; runtime text overlays retain their
+separate slot checks.
+
 The layout safety policy drives the automated layout quality review (overlap
 padding, text slot fit, and guide-line alignment). All fields are optional:
 

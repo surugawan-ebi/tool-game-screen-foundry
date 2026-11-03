@@ -24,6 +24,8 @@ const state = {
   selectedCompositionEditorGroupId: "",
   selectedCompositionGroupId: "",
   selectedPlacementId: "",
+  layerEditorState: {},
+  workspaceBusy: false,
   placementPointerEdit: null,
   placementTuneMode: false,
   movePlacementDependents: true,
@@ -43,6 +45,7 @@ const MIN_BUSY_MS = 650;
 const placementEditLogic = window.GameScreenFoundryPlacementEditLogic;
 
 const elements = {
+  layerPanel: document.getElementById("layerPanel"),
   activityOverlay: document.getElementById("activityOverlay"),
   activityOverlayLabel: document.getElementById("activityOverlayLabel"),
   activityStatus: document.getElementById("activityStatus"),
@@ -341,6 +344,8 @@ function setWorkspaceTab(tabId, { persist = true } = {}) {
 }
 
 function setWorkspaceBusy(busy, label) {
+  state.workspaceBusy = busy;
+  elements.layerPanel.inert = busy;
   elements.activityOverlay.classList.toggle("hidden", !busy);
   elements.activityOverlayLabel.textContent = label;
   elements.screenCanvasWrap.classList.toggle("is-busy", busy);
@@ -521,6 +526,7 @@ function renderStructuredEditHistory() {
 }
 
 function resetStructuredEditSession() {
+  state.layerEditorState = {};
   state.structuredEditHistory = [];
   state.structuredEditUndoStack = [];
   state.structuredLastSavedAt = "";
@@ -530,6 +536,7 @@ function resetStructuredEditSession() {
 }
 
 function restoreStructuredSnapshot(snapshot) {
+  state.layerEditorState = cloneJson(snapshot.layerEditorState || {});
   syncStateFromPayload(cloneJson(snapshot));
   state.regenerationQueue = cloneJson(snapshot.regenerationQueue || []);
   state.regenerationQueueDirty = Boolean(snapshot.regenerationQueueDirty);
@@ -551,7 +558,8 @@ function recordStructuredEdit({
   queuedCount = 0
 }) {
   const afterSnapshot = captureStructuredSnapshot();
-  if (beforeSnapshot && getStructuredSnapshotKey(beforeSnapshot) === getStructuredSnapshotKey(afterSnapshot)) {
+  if (beforeSnapshot && getStructuredSnapshotKey(beforeSnapshot) === getStructuredSnapshotKey(afterSnapshot)
+    && JSON.stringify(beforeSnapshot.layerEditorState || {}) === JSON.stringify(afterSnapshot.layerEditorState || {})) {
     updateStructuredEditDirtyFromSnapshot(afterSnapshot);
     renderStructuredEditHistory();
     return false;
@@ -871,26 +879,7 @@ function applyPlacementGeometry(placement, geometry, { liveDom = true, syncField
 }
 
 function updateOverlaySlotFromGeometry(overlay) {
-  if (!overlay || !overlay.targetPlacementId) {
-    return;
-  }
-  const target = getPlacements().find((placement) => placement.placementId === overlay.targetPlacementId);
-  if (!target) {
-    return;
-  }
-  const targetLeft = target.x - target.width / 2;
-  const targetTop = target.y - target.height / 2;
-  overlay.slot = {
-    ...(overlay.slot || {}),
-    x: Math.round((overlay.x - overlay.width / 2 - targetLeft) * 10) / 10,
-    y: Math.round((overlay.y - overlay.height / 2 - targetTop) * 10) / 10,
-    width: overlay.width,
-    height: overlay.height
-  };
-  delete overlay.slot.right;
-  delete overlay.slot.bottom;
-  delete overlay.slot.offsetX;
-  delete overlay.slot.offsetY;
+  placementEditLogic.updateOverlaySlotFromGeometryForSpec(state.materialSpecSheet || {}, overlay);
 }
 
 function applyOverlayGeometry(overlay, geometry, { liveDom = true, syncFields = true } = {}) {
@@ -964,6 +953,147 @@ function syncOverlayAbsoluteGeometry() {
   placementEditLogic.syncOverlayAbsoluteGeometryForSpec(state.materialSpecSheet);
 }
 
+function getLayerEditorFlags(id) {
+  return Object.hasOwn(state.layerEditorState, id) ? state.layerEditorState[id] : {};
+}
+
+function assertGeometryEditLayersUnlocked(geometryEdit = {}) {
+  const ids = placementEditLogic.collectGeometryEditLayerIds(state.materialSpecSheet || {}, {
+    ...geometryEdit,
+    selectedId: state.selectedPlacementId
+  });
+  if (ids.some((id) => getLayerEditorFlags(id).locked)) {
+    throw new Error("対象または追従する素材・文字がロックされています。先にロックを解除してください。");
+  }
+}
+
+function assertLayerEditable(geometryEdit = {}) {
+  if (state.workspaceBusy || state.placementPointerEdit) {
+    throw new Error("処理中です。完了後に編集してください。");
+  }
+  assertGeometryEditLayersUnlocked(geometryEdit);
+}
+
+function getPlacementGeometryEdit(placement, geometry, dependents, dependentOverlays = []) {
+  const dx = geometry.x - placement.x;
+  const dy = geometry.y - placement.y;
+  const translated = (item) => ({ ...item, x: item.x + dx, y: item.y + dy });
+  return {
+    placementUpdates: [{ ...placement, ...geometry }, ...(dx || dy ? dependents.map(translated) : [])],
+    overlayUpdates: dx || dy ? dependentOverlays.map(translated) : []
+  };
+}
+
+function toggleLayerEditorFlag(id, flag) {
+  if (state.workspaceBusy || state.placementPointerEdit) {
+    return;
+  }
+  const beforeSnapshot = captureStructuredSnapshot();
+  state.layerEditorState = { ...state.layerEditorState, [id]: {
+    ...getLayerEditorFlags(id), [flag]: !getLayerEditorFlags(id)[flag]
+  } };
+  recordStructuredEdit({ label: `${id} の${flag === "hidden" ? "表示" : "ロック"}を切替`, beforeSnapshot });
+  renderStructuredSpecEditor();
+  if (state.renderModel) {
+    renderScreen();
+  }
+}
+
+async function reorderLayer(sourceZ, targetZ) {
+  if (state.workspaceBusy || state.placementPointerEdit) {
+    return;
+  }
+  const beforeSnapshot = captureStructuredSnapshot();
+  try {
+    if (placementEditLogic.reorderLayerGroup(state.materialSpecSheet, state.layerEditorState, sourceZ, targetZ)) {
+      await refreshAfterStructuredSpecEdit(`レイヤー z${sourceZ} を z${targetZ} の位置へ移動`, null, { beforeSnapshot });
+    }
+  } catch (error) {
+    window.alert(error.message);
+  }
+}
+
+function renderLayerPanel() {
+  const scrollTop = elements.layerPanel.scrollTop;
+  elements.layerPanel.replaceChildren();
+  const groups = placementEditLogic.getLayerGroups(state.materialSpecSheet || {});
+  if (!groups.length) {
+    elements.layerPanel.textContent = "画面を読み込むとレイヤーが表示されます。";
+  }
+  groups.forEach((group, index) => {
+    const section = document.createElement("section");
+    section.className = "layer-group";
+    const header = document.createElement("div");
+    header.className = "layer-group-header";
+    const locked = group.items.some((item) => getLayerEditorFlags(getEditableId(item)).locked);
+    header.draggable = !locked;
+    const title = document.createElement("strong");
+    title.textContent = `z ${group.zIndex} · ${group.items.length}件`;
+    header.appendChild(title);
+    header.addEventListener("dragstart", (event) => {
+      if (state.workspaceBusy || state.placementPointerEdit || locked) {
+        event.preventDefault();
+        return;
+      }
+      event.dataTransfer.setData("application/x-foundry-layer", String(group.zIndex));
+      event.dataTransfer.effectAllowed = "move";
+    });
+    header.addEventListener("dragover", (event) => {
+      if (event.dataTransfer.types.includes("application/x-foundry-layer")) {
+        event.preventDefault();
+      }
+    });
+    header.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const source = event.dataTransfer.getData("application/x-foundry-layer");
+      if (source !== "" && Number.isFinite(Number(source))) {
+        reorderLayer(Number(source), group.zIndex);
+      }
+    });
+    for (const [offset, label] of [[-1, "↑"], [1, "↓"]]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.setAttribute("aria-label", `z ${group.zIndex} を${offset < 0 ? "手前" : "奥"}へ`);
+      button.disabled = locked || !groups[index + offset];
+      button.addEventListener("click", () => reorderLayer(group.zIndex, groups[index + offset].zIndex));
+      header.appendChild(button);
+    }
+    section.appendChild(header);
+    group.items.forEach((item) => {
+      const id = getEditableId(item);
+      const flags = getLayerEditorFlags(id);
+      const row = document.createElement("div");
+      row.className = "layer-row";
+      row.classList.toggle("is-selected", id === state.selectedPlacementId);
+      const select = document.createElement("button");
+      select.type = "button";
+      select.className = "layer-name";
+      select.textContent = `${item.overlayId ? "文字" : "素材"} · ${id}`;
+      select.setAttribute("aria-pressed", String(id === state.selectedPlacementId));
+      select.addEventListener("click", () => {
+        if (state.workspaceBusy || state.placementPointerEdit) return;
+        state.selectedPlacementId = id;
+        renderStructuredSpecEditor();
+        if (state.renderModel) renderScreen();
+      });
+      row.appendChild(select);
+      for (const [flag, label] of [["hidden", flags.hidden ? "非表示" : "表示"], ["locked", flags.locked ? "解除" : "ロック"]]) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.setAttribute("aria-label", `${id}: ${flag === "hidden" ? "非表示" : "ロック"}を切替`);
+        button.setAttribute("aria-pressed", String(Boolean(flags[flag])));
+        button.addEventListener("click", () => toggleLayerEditorFlag(id, flag));
+        row.appendChild(button);
+      }
+      section.appendChild(row);
+    });
+    elements.layerPanel.appendChild(section);
+  });
+  elements.layerPanel.scrollTop = scrollTop;
+}
+
 function renderStructuredSpecEditor() {
   const placements = getPlacements();
   const overlays = getContentOverlays();
@@ -1025,6 +1155,7 @@ function renderStructuredSpecEditor() {
   elements.contentInsetRightInput.value = group ? inset.right : "";
   elements.contentInsetBottomInput.value = group ? inset.bottom : "";
   elements.contentInsetLeftInput.value = group ? inset.left : "";
+  renderLayerPanel();
   renderStructuredEditHistory();
 }
 
@@ -1260,6 +1391,7 @@ async function refreshAfterStructuredSpecEdit(message, button, options = {}) {
 
 async function applyPlacementEditor() {
   try {
+    assertLayerEditable();
     const placement = getSelectedPlacement();
     const overlay = getSelectedOverlay();
     const beforeSnapshot = placement || overlay ? captureStructuredSnapshot() : null;
@@ -1292,12 +1424,14 @@ async function applyPlacementEditor() {
     const dependents = state.movePlacementDependents ? collectDependentPlacements(placement) : [];
     const dx = nextX - placement.x;
     const dy = nextY - placement.y;
-    applyPlacementGeometry(placement, {
+    const geometry = {
       x: nextX,
       y: nextY,
       width: readNumberField(elements.placementWidthInput, "w", { min: 1 }),
       height: readNumberField(elements.placementHeightInput, "h", { min: 1 })
-    });
+    };
+    assertLayerEditable(getPlacementGeometryEdit(placement, geometry, dependents));
+    applyPlacementGeometry(placement, geometry);
     shiftDependentPlacements(dependents, dx, dy);
     placement.zIndex = readNumberField(elements.placementZInput, "z");
     const parentId = elements.placementParentInput.value.trim();
@@ -1321,6 +1455,7 @@ async function applyPlacementEditor() {
 
 async function adjustSelectedPlacementGeometry(delta, label) {
   try {
+    assertLayerEditable();
     const placement = getSelectedPlacement();
     const overlay = getSelectedOverlay();
     const beforeSnapshot = placement || overlay ? captureStructuredSnapshot() : null;
@@ -1345,12 +1480,14 @@ async function adjustSelectedPlacementGeometry(delta, label) {
     };
     const dependents = state.movePlacementDependents ? collectDependentPlacements(placement) : [];
     const dependentOverlays = state.movePlacementDependents ? collectDependentOverlays(placement, dependents) : [];
-    applyPlacementGeometry(placement, {
+    const geometry = {
       x: placement.x + (delta.x || 0),
       y: placement.y + (delta.y || 0),
       width: placement.width + (delta.width || 0),
       height: placement.height + (delta.height || 0)
-    });
+    };
+    assertLayerEditable(getPlacementGeometryEdit(placement, geometry, dependents, dependentOverlays));
+    applyPlacementGeometry(placement, geometry);
     shiftDependentPlacements(dependents, delta.x || 0, delta.y || 0);
     shiftDependentOverlays(dependentOverlays, delta.x || 0, delta.y || 0);
     const followedCount = dependents.length + dependentOverlays.length;
@@ -1425,27 +1562,39 @@ function handlePlacementPointerMove(event) {
     applyOverlayGeometry(editable.item, geometry);
     return;
   }
-  applyPlacementGeometry(editable.item, geometry);
+  const placementUpdates = [{ ...editable.item, ...geometry }];
+  const overlayUpdates = [];
   if (edit.dependents && edit.mode !== "resize-se") {
     const dx = Math.round(geometry.x) - edit.startPlacement.x;
     const dy = Math.round(geometry.y) - edit.startPlacement.y;
     for (const dependent of edit.dependents) {
-      applyPlacementGeometry(dependent.placement, {
+      placementUpdates.push({
+        ...dependent.placement,
         x: dependent.startX + dx,
-        y: dependent.startY + dy,
-        width: dependent.placement.width,
-        height: dependent.placement.height
-      }, { syncFields: false });
+        y: dependent.startY + dy
+      });
     }
     for (const overlay of edit.dependentOverlays || []) {
-      applyOverlayGeometry(overlay.overlay, {
+      overlayUpdates.push({
+        ...overlay.overlay,
         x: overlay.startX + dx,
-        y: overlay.startY + dy,
-        width: overlay.overlay.width,
-        height: overlay.overlay.height
-      }, { syncFields: false });
+        y: overlay.startY + dy
+      });
     }
   }
+  try {
+    assertGeometryEditLayersUnlocked({ placementUpdates, overlayUpdates });
+  } catch (error) {
+    setActivityStatus(error.message);
+    return;
+  }
+  applyPlacementGeometry(editable.item, geometry);
+  (edit.dependents || []).forEach((dependent, index) => {
+    applyPlacementGeometry(dependent.placement, placementUpdates[index + 1], { syncFields: false });
+  });
+  (edit.dependentOverlays || []).forEach((overlay, index) => {
+    applyOverlayGeometry(overlay.overlay, overlayUpdates[index], { syncFields: false });
+  });
 }
 
 function finishPlacementPointerEdit(event) {
@@ -1486,6 +1635,12 @@ function finishPlacementPointerEdit(event) {
 }
 
 function startPlacementPointerEdit(event, mode) {
+  try {
+    assertLayerEditable();
+  } catch (error) {
+    setActivityStatus(error.message);
+    return;
+  }
   if (!state.placementTuneMode || !state.renderModel) {
     return;
   }
@@ -1926,6 +2081,9 @@ function renderCompositionOverlays(group) {
 }
 
 function renderPlacementEditOverlay() {
+  if (getLayerEditorFlags(state.selectedPlacementId).hidden || getLayerEditorFlags(state.selectedPlacementId).locked) {
+    return;
+  }
   if (!state.placementTuneMode || !state.renderModel || !state.selectedPlacementId) {
     return;
   }
@@ -1976,6 +2134,9 @@ function renderScreen() {
   elements.screenCanvas.style.height = `${screen.height}px`;
 
   screen.layers.forEach((layer) => {
+    if (getLayerEditorFlags(layer.placementId).hidden) {
+      return;
+    }
     const image = document.createElement("img");
     image.className = "screen-layer";
     if (selectedPlacementIds) {

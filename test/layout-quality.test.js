@@ -52,7 +52,7 @@ test("undeclared partial sibling overlap fails under explicit_overlap_only", () 
   const review = buildLayoutReview(makeInput({
     placements: [
       placement("a", "asset_a", 100, 100, 100, 50),
-      placement("b", "asset_b", 160, 100, 100, 50)
+      placement("b", "asset_b", 160, 100, 100, 50, { zIndex: 11 })
     ],
     assets: [asset("asset_a"), asset("asset_b")]
   }));
@@ -64,7 +64,7 @@ test("declared overlap passes", () => {
   const review = buildLayoutReview(makeInput({
     placements: [
       placement("a", "asset_a", 100, 100, 100, 50),
-      placement("b", "asset_b", 160, 100, 100, 50)
+      placement("b", "asset_b", 160, 100, 100, 50, { zIndex: 11 })
     ],
     assets: [asset("asset_a"), asset("asset_b")],
     assemblyPolicy: {
@@ -74,7 +74,53 @@ test("declared overlap passes", () => {
     }
   }));
   assert.ok(codes(review, "pass").includes("overlap_declared"));
+  assert.ok(!codes(review, "fail").includes("same_layer_overlap"));
   assert.ok(!codes(review, "fail").includes("overlap_undeclared"));
+});
+
+test("same-layer overlap cannot be exempted by policy, ancestry, or grouping", () => {
+  for (const parentId of [undefined, "a"]) {
+    for (const grouped of [false, true]) {
+      const review = buildLayoutReview(makeInput({
+        placements: [
+          placement("a", "asset_a", 100, 100, 100, 100),
+          placement("b", "asset_b", 100, 100, 20, 20, { parentId })
+        ],
+        compositionGroups: grouped ? [{ rootPlacementId: "a", layerPlacementIds: ["b"] }] : [],
+        assemblyPolicy: { layoutSafetyPolicy: {
+          mode: "permissive", siblingOverlapDefault: "allowed",
+          allowedOverlaps: [{ source: "a", target: "b", minPadding: 0 }]
+        } }
+      }));
+      const failures = review.checks.filter((check) => check.code === "same_layer_overlap");
+      assert.equal(failures.length, 1);
+      assert.equal(failures[0].status, "fail");
+      assert.deepEqual(failures[0].refs.placementIds, ["a", "b"]);
+      assert.equal(failures[0].refs.zIndex, 10);
+      assert.equal(review.summary.status, "fail");
+    }
+  }
+});
+
+test("same-layer bounds allow touching but reject positive intersections", () => {
+  for (const [x, y, expected] of [[200, 100, false], [200, 200, false], [201, 100, false], [199.9, 100, true], [100, 100, true]]) {
+    const review = buildLayoutReview(makeInput({ placements: [
+      placement("a", "asset_a", 100, 100, 100, 100, { zIndex: -1 }),
+      placement("b", "asset_b", x, y, 100, 100, { zIndex: -1 })
+    ] }));
+    assert.equal(codes(review, "fail").includes("same_layer_overlap"), expected);
+  }
+});
+
+test("same-layer backdrop and fill placements are not exempt", () => {
+  const review = buildLayoutReview(makeInput({
+    placements: [
+      placement("bg", "asset_bg", 640, 360, 1280, 720, { zIndex: 0 }),
+      placement("fill", "asset_fill", 640, 360, 100, 20, { zIndex: 0 })
+    ],
+    assets: [asset("asset_bg", "background", "gauge_base"), asset("asset_fill", "panel", "fill")]
+  }));
+  assert.ok(codes(review, "fail").includes("same_layer_overlap"));
 });
 
 test("stacked asset touching the base edge fails, tight clearance warns", () => {
