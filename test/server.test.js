@@ -1377,8 +1377,11 @@ test("electron shell wraps the local server without exposing node integration", 
   assert.equal(pkg.main, "electron/main.js");
   assert.equal(pkg.scripts.desktop, "node scripts/start-electron.js");
   assert.equal(pkg.scripts["desktop:dev"], "node scripts/start-electron.js --devtools");
-  assert.equal(pkg.devDependencies.electron, "^43.0.0");
-  assert.ok(fs.existsSync(path.join(__dirname, "..", "package-lock.json")));
+  assert.match(pkg.devDependencies.electron, /^\^\d+\.\d+\.\d+$/u);
+  const lock = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package-lock.json"), "utf8"));
+  assert.equal(lock.packages[""].devDependencies.electron, pkg.devDependencies.electron);
+  assert.match(lock.packages["node_modules/electron"].version, /^\d+\.\d+\.\d+$/u);
+  assert.equal(lock.packages["node_modules/electron"].version.split(".")[0], pkg.devDependencies.electron.slice(1).split(".")[0]);
   assert.match(main, /createServer/u);
   assert.match(main, /serverInstance\.listen\(port, HOST/u);
   assert.match(main, /DEFAULT_WINDOW_WIDTH = 1720/u);
