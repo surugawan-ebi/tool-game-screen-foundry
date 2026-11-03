@@ -154,6 +154,29 @@
     return updated;
   }
 
+  function updateOverlaySlotFromGeometryForSpec(spec, overlay) {
+    if (!overlay || !overlay.targetPlacementId) {
+      return;
+    }
+    const target = (spec.placements || []).find((placement) => placement.placementId === overlay.targetPlacementId);
+    if (!target) {
+      return;
+    }
+    const targetLeft = target.x - target.width / 2;
+    const targetTop = target.y - target.height / 2;
+    overlay.slot = {
+      ...(overlay.slot || {}),
+      x: Math.round((overlay.x - overlay.width / 2 - targetLeft) * 10) / 10,
+      y: Math.round((overlay.y - overlay.height / 2 - targetTop) * 10) / 10,
+      width: overlay.width,
+      height: overlay.height
+    };
+    delete overlay.slot.right;
+    delete overlay.slot.bottom;
+    delete overlay.slot.offsetX;
+    delete overlay.slot.offsetY;
+  }
+
   function getLayerGroups(spec) {
     const groups = new Map();
     for (const item of [...(spec.placements || []), ...(spec.contentOverlays || [])]) {
@@ -164,6 +187,57 @@
       groups.get(zIndex).items.push(item);
     }
     return [...groups.values()].sort((left, right) => right.zIndex - left.zIndex);
+  }
+
+  // Updates describe the geometry writes the operation will actually perform.
+  // Re-sync slots on copies so unchanged children and anchored text do not
+  // become locked dependencies merely because their parent is selected.
+  function collectGeometryEditLayerIds(spec, { selectedId, placementUpdates = [], overlayUpdates = [] }) {
+    const nextSpec = {
+      placements: (spec.placements || []).map((item) => ({ ...item })),
+      contentOverlays: (spec.contentOverlays || []).map((item) => ({ ...item }))
+    };
+    const ids = new Set(selectedId ? [selectedId] : []);
+    const geometryKeys = ["x", "y", "width", "height"];
+    const geometryChanged = (before, after) => geometryKeys.some((key) => before[key] !== after[key]);
+    const applyGeometry = (item, update) => {
+      item.x = Math.round(update.x);
+      item.y = Math.round(update.y);
+      item.width = Math.max(1, Math.round(update.width));
+      item.height = Math.max(1, Math.round(update.height));
+    };
+
+    for (const update of placementUpdates) {
+      const item = nextSpec.placements.find((placement) => placement.placementId === update.placementId);
+      if (!item) {
+        continue;
+      }
+      const before = { ...item };
+      applyGeometry(item, update);
+      if (geometryChanged(before, item)) {
+        ids.add(item.placementId);
+      }
+    }
+
+    for (const update of overlayUpdates) {
+      const item = nextSpec.contentOverlays.find((overlay) => overlay.overlayId === update.overlayId);
+      if (!item) {
+        continue;
+      }
+      const before = { ...item };
+      applyGeometry(item, update);
+      updateOverlaySlotFromGeometryForSpec(nextSpec, item);
+      if (geometryChanged(before, item) || JSON.stringify(before.slot) !== JSON.stringify(item.slot)) {
+        ids.add(item.overlayId);
+      }
+    }
+    syncOverlayAbsoluteGeometryForSpec(nextSpec);
+    nextSpec.contentOverlays.forEach((item, index) => {
+      if (geometryChanged(spec.contentOverlays[index], item)) {
+        ids.add(item.overlayId);
+      }
+    });
+    return [...ids];
   }
 
   function reorderLayerGroup(spec, editorState, sourceZ, targetZ) {
@@ -190,8 +264,10 @@
     getLayerGroups,
     reorderLayerGroup,
     captureStructuredEditSnapshot,
+    collectGeometryEditLayerIds,
     collectDependentPlacementIds,
     getStructuredContractSnapshotKey,
-    syncOverlayAbsoluteGeometryForSpec
+    syncOverlayAbsoluteGeometryForSpec,
+    updateOverlaySlotFromGeometryForSpec
   };
 });

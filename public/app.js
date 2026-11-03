@@ -879,26 +879,7 @@ function applyPlacementGeometry(placement, geometry, { liveDom = true, syncField
 }
 
 function updateOverlaySlotFromGeometry(overlay) {
-  if (!overlay || !overlay.targetPlacementId) {
-    return;
-  }
-  const target = getPlacements().find((placement) => placement.placementId === overlay.targetPlacementId);
-  if (!target) {
-    return;
-  }
-  const targetLeft = target.x - target.width / 2;
-  const targetTop = target.y - target.height / 2;
-  overlay.slot = {
-    ...(overlay.slot || {}),
-    x: Math.round((overlay.x - overlay.width / 2 - targetLeft) * 10) / 10,
-    y: Math.round((overlay.y - overlay.height / 2 - targetTop) * 10) / 10,
-    width: overlay.width,
-    height: overlay.height
-  };
-  delete overlay.slot.right;
-  delete overlay.slot.bottom;
-  delete overlay.slot.offsetX;
-  delete overlay.slot.offsetY;
+  placementEditLogic.updateOverlaySlotFromGeometryForSpec(state.materialSpecSheet || {}, overlay);
 }
 
 function applyOverlayGeometry(overlay, geometry, { liveDom = true, syncFields = true } = {}) {
@@ -976,17 +957,31 @@ function getLayerEditorFlags(id) {
   return Object.hasOwn(state.layerEditorState, id) ? state.layerEditorState[id] : {};
 }
 
-function assertLayerEditable() {
-  if (state.workspaceBusy || state.placementPointerEdit) {
-    throw new Error("処理中です。完了後に編集してください。");
-  }
-  const placement = getSelectedPlacement();
-  const dependents = placement ? collectDependentPlacements(placement) : [];
-  const ids = [state.selectedPlacementId, ...dependents.map((item) => item.placementId),
-    ...(placement ? collectDependentOverlays(placement, dependents).map((item) => item.overlayId) : [])];
+function assertGeometryEditLayersUnlocked(geometryEdit = {}) {
+  const ids = placementEditLogic.collectGeometryEditLayerIds(state.materialSpecSheet || {}, {
+    ...geometryEdit,
+    selectedId: state.selectedPlacementId
+  });
   if (ids.some((id) => getLayerEditorFlags(id).locked)) {
     throw new Error("対象または追従する素材・文字がロックされています。先にロックを解除してください。");
   }
+}
+
+function assertLayerEditable(geometryEdit = {}) {
+  if (state.workspaceBusy || state.placementPointerEdit) {
+    throw new Error("処理中です。完了後に編集してください。");
+  }
+  assertGeometryEditLayersUnlocked(geometryEdit);
+}
+
+function getPlacementGeometryEdit(placement, geometry, dependents, dependentOverlays = []) {
+  const dx = geometry.x - placement.x;
+  const dy = geometry.y - placement.y;
+  const translated = (item) => ({ ...item, x: item.x + dx, y: item.y + dy });
+  return {
+    placementUpdates: [{ ...placement, ...geometry }, ...(dx || dy ? dependents.map(translated) : [])],
+    overlayUpdates: dx || dy ? dependentOverlays.map(translated) : []
+  };
 }
 
 function toggleLayerEditorFlag(id, flag) {
@@ -1429,12 +1424,14 @@ async function applyPlacementEditor() {
     const dependents = state.movePlacementDependents ? collectDependentPlacements(placement) : [];
     const dx = nextX - placement.x;
     const dy = nextY - placement.y;
-    applyPlacementGeometry(placement, {
+    const geometry = {
       x: nextX,
       y: nextY,
       width: readNumberField(elements.placementWidthInput, "w", { min: 1 }),
       height: readNumberField(elements.placementHeightInput, "h", { min: 1 })
-    });
+    };
+    assertLayerEditable(getPlacementGeometryEdit(placement, geometry, dependents));
+    applyPlacementGeometry(placement, geometry);
     shiftDependentPlacements(dependents, dx, dy);
     placement.zIndex = readNumberField(elements.placementZInput, "z");
     const parentId = elements.placementParentInput.value.trim();
@@ -1483,12 +1480,14 @@ async function adjustSelectedPlacementGeometry(delta, label) {
     };
     const dependents = state.movePlacementDependents ? collectDependentPlacements(placement) : [];
     const dependentOverlays = state.movePlacementDependents ? collectDependentOverlays(placement, dependents) : [];
-    applyPlacementGeometry(placement, {
+    const geometry = {
       x: placement.x + (delta.x || 0),
       y: placement.y + (delta.y || 0),
       width: placement.width + (delta.width || 0),
       height: placement.height + (delta.height || 0)
-    });
+    };
+    assertLayerEditable(getPlacementGeometryEdit(placement, geometry, dependents, dependentOverlays));
+    applyPlacementGeometry(placement, geometry);
     shiftDependentPlacements(dependents, delta.x || 0, delta.y || 0);
     shiftDependentOverlays(dependentOverlays, delta.x || 0, delta.y || 0);
     const followedCount = dependents.length + dependentOverlays.length;
@@ -1563,27 +1562,39 @@ function handlePlacementPointerMove(event) {
     applyOverlayGeometry(editable.item, geometry);
     return;
   }
-  applyPlacementGeometry(editable.item, geometry);
+  const placementUpdates = [{ ...editable.item, ...geometry }];
+  const overlayUpdates = [];
   if (edit.dependents && edit.mode !== "resize-se") {
     const dx = Math.round(geometry.x) - edit.startPlacement.x;
     const dy = Math.round(geometry.y) - edit.startPlacement.y;
     for (const dependent of edit.dependents) {
-      applyPlacementGeometry(dependent.placement, {
+      placementUpdates.push({
+        ...dependent.placement,
         x: dependent.startX + dx,
-        y: dependent.startY + dy,
-        width: dependent.placement.width,
-        height: dependent.placement.height
-      }, { syncFields: false });
+        y: dependent.startY + dy
+      });
     }
     for (const overlay of edit.dependentOverlays || []) {
-      applyOverlayGeometry(overlay.overlay, {
+      overlayUpdates.push({
+        ...overlay.overlay,
         x: overlay.startX + dx,
-        y: overlay.startY + dy,
-        width: overlay.overlay.width,
-        height: overlay.overlay.height
-      }, { syncFields: false });
+        y: overlay.startY + dy
+      });
     }
   }
+  try {
+    assertGeometryEditLayersUnlocked({ placementUpdates, overlayUpdates });
+  } catch (error) {
+    setActivityStatus(error.message);
+    return;
+  }
+  applyPlacementGeometry(editable.item, geometry);
+  (edit.dependents || []).forEach((dependent, index) => {
+    applyPlacementGeometry(dependent.placement, placementUpdates[index + 1], { syncFields: false });
+  });
+  (edit.dependentOverlays || []).forEach((overlay, index) => {
+    applyOverlayGeometry(overlay.overlay, overlayUpdates[index], { syncFields: false });
+  });
 }
 
 function finishPlacementPointerEdit(event) {
